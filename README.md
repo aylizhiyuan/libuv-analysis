@@ -2,9 +2,11 @@
  * @Author: lizhiyuan
  * @Date: 2019-10-06 15:06:49
  * @LastEditors: lizhiyuan
- * @LastEditTime: 2020-12-04 14:12:04
+ * @LastEditTime: 2020-12-04 14:16:55
 -->
 # libuv源码分析
+
+## 1. socket阻塞模式和非阻塞模式
 
 网络传输数据链路分析
 
@@ -17,6 +19,13 @@
 ```
 
 ![](./image/socket.png)
+
+- connect
+- accept
+- send / write
+- recv / read
+
+
 
 
 
