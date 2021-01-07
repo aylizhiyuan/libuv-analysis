@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2019-10-06 15:06:49
  * @LastEditors: lizhiyuan
- * @LastEditTime: 2020-12-13 21:36:28
+ * @LastEditTime: 2021-01-06 10:29:24
 -->
 # libuv源码分析
 
@@ -139,6 +139,8 @@ NodeJS中为了不积压,pipe当可写流返回false的时候,可读流停止..�
 
 
 ## 2. 实现一个简单的eventloop
+
+
 
 
 
