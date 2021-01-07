@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2019-10-06 15:06:49
  * @LastEditors: lizhiyuan
- * @LastEditTime: 2021-01-06 10:29:24
+ * @LastEditTime: 2021-01-07 15:19:54
 -->
 # libuv源码分析
 
@@ -140,6 +140,29 @@ NodeJS中为了不积压,pipe当可写流返回false的时候,可读流停止..�
 
 ## 2. 实现一个简单的eventloop
 
+
+实例,定时,打印hello world 每10秒
+
+```
+int print(struct aeEventLoop *loop, long long id, void *clientData)
+{
+    printf("%lld - Hello, World\n", id);
+    return -1;
+}
+
+int main(void)
+{
+    aeEventLoop *loop = aeCreateEventLoop(0);
+    int i;
+    for (i = 0; i < 10; i ++) {
+        aeCreateTimeEvent(loop, i*1000, print, NULL, NULL);
+    }
+    aeMain(loop);
+    aeDeleteEventLoop(loop);
+    return 0;
+}
+
+```
 
 
 
