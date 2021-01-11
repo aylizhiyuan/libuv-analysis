@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2019-10-06 15:06:49
  * @LastEditors: lizhiyuan
- * @LastEditTime: 2021-01-07 16:10:32
+ * @LastEditTime: 2021-01-08 15:25:19
 -->
 # libuv源码分析
 
@@ -139,6 +139,12 @@ NodeJS中为了不积压,pipe当可写流返回false的时候,可读流停止..�
 
 
 ## 2. 实现一个简单的eventloop
+
+这里将彻底整理我对异步的看法和理解....
+
+如果用代码的方式实现一个异步是所有问题的关键.....
+
+
 
 
 
