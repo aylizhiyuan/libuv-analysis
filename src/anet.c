@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:11:35
  * @LastEditors: lizhiyuan
- * @LastEditTime: 2021-01-20 16:46:43
+ * @LastEditTime: 2021-01-21 14:36:48
  */
 #include "fmacros.h"
 #include <sys/types.h>
@@ -65,6 +65,7 @@ int anetSetBlock(char *err,int fd,int non_block){
 int anetNonBlock(char *err,int fd){
     return anetSetBlock(err,fd,1); // 设置为非阻塞模式
 }
+
 int anetBlock(char *err,int fd){
     return anetSetBlock(err,fd,0); // 设置为阻塞模式
 }
@@ -101,4 +102,144 @@ int anetKeepAlive(char *err,int fd,int interval){
         return ANET_OK;
 }
 
+/**
+ * @description: 设置TCP的延迟确认关闭还是开启
+ * @param {*}
+ * @return {*}
+ */
+static int anetSetTcpNoDelay(char *err,int fd,int val){
+    if(setsockopt(fd,IPPROTO_TCP,TCP_NODELAY,&val,sizeof(val)) == -1){
+        anetSetError(err,"setsockopt TCP_NODELAY:%s",strerror(errno));
+        return ANET_ERR;
+    }
+    return ANET_OK;
+}
+
+// 开启(默认开启)延迟确认
+int anetEnableTcpNoDelay(char *err,int fd){
+    return anetSetTcpNoDelay(err,fd,1);
+}
+
+// 关闭延迟确认,启用快速确认
+int anetDisableTcpNoDelay(char *err,int fd){
+    return anetSetTcpNoDelay(err,fd,0);
+}
+
+/**
+ * @description:  设置发送缓冲区的大小,实际是8688个字节,如果数据较大,可重新设置
+ * @param {char} *err
+ * @param {int} fd
+ * @param {int} buffsize
+ * @return {*}
+ */
+int anetSetSendBuffer(char *err,int fd,int buffsize){
+    if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &buffsize, sizeof(buffsize)) == -1){
+        anetSetError(err, "setsockopt SO_SNDBUF: %s", strerror(errno));
+        return ANET_ERR;
+    }
+    return ANET_OK;
+}
+
+/**
+ * @description:  设置keepalive开启
+ * @param {char} *err
+ * @param {int} fd
+ * @return {*}
+ */
+int anetTcpKeepAlive(char *err,int fd){
+    int yes = 1;
+    if(setsockopt(fd,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(yes)) == -1){
+        anetSetError(err,"setsockopt SO_KEEPALIVE:%s",strerror(errno));
+        return ANET_ERR;
+    }
+    return ANET_OK;
+}
+
+/**
+ * @description:  设置socket超时时间
+ * @param {char} *err
+ * @param {int} fd
+ * @param {longlong} ms
+ * @return {*}
+ */
+int anetSendTimeout(char *err,int fd,long long ms){
+    struct timeval tv;
+    tv.tv_sec = ms/1000;
+    tv.tv_usec = (ms%1000)*1000;
+    if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) == -1) {
+        anetSetError(err, "setsockopt SO_SNDTIMEO: %s", strerror(errno));
+        return ANET_ERR;
+    }
+    return ANET_OK;
+}
+
+/**
+ * @description: 解析主机名到ipbuf中去
+ * @param {char} *err
+ * @param {char} *host
+ * @param {char} *ipbuf
+ * @param {size_t} ipbuf_len
+ * @param {int} flags
+ * @return {*}
+ */
+int anetGenericResolve(char *err,char *host,char *ipbuf,size_t ipbuf_len,int flags){
+    struct addrinfo hints,*info;
+    int rv;
+    memset(&hints,0,sizeof(hints));
+    if(flags & ANET_IP_ONLY) hints.ai_flags = AI_NUMERICHOST;
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    if ((rv = getaddrinfo(host, NULL, &hints, &info)) != 0) {
+        anetSetError(err, "%s", gai_strerror(rv));
+        return ANET_ERR;
+    }
+    if (info->ai_family == AF_INET) {
+        struct sockaddr_in *sa = (struct sockaddr_in *)info->ai_addr;
+        inet_ntop(AF_INET, &(sa->sin_addr), ipbuf, ipbuf_len);
+    } else {
+        struct sockaddr_in6 *sa = (struct sockaddr_in6 *)info->ai_addr;
+        inet_ntop(AF_INET6, &(sa->sin6_addr), ipbuf, ipbuf_len);
+    }
+
+    freeaddrinfo(info);
+    return ANET_OK;
+}
+
+int anetResolve(char *err,char *host,char *ipbuf,size_t ipbuf_len){
+    return anetGenericResolve(err,host,ipbuf,ipbuf_len,ANET_NONE);
+}
+
+int anetResolveIP(char *err,char *host,char *ipbuf,size_t ipbuf_len){
+    return anetGenericResolve(err,host,ipbuf,ipbuf_len,ANET_IP_ONLY);
+}
+// 设置服务器bind一个地址,即使这个地址当前已经存在已建立的连接
+static int anetSetReuseAddr(char *err, int fd) {
+    int yes = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
+        anetSetError(err, "setsockopt SO_REUSEADDR: %s", strerror(errno));
+        return ANET_ERR;
+    }
+    return ANET_OK;
+}
+
+static int anetCreateSocket(char *err,int domain){
+    int s;
+    // 创建一个套接字
+    if((s = socket(domain,SOCK_STREAM,0)) == -1){
+        anetSetError(err,"createing socket:%s",strerror(errno));
+        return ANET_ERR;
+    }
+    if(anetSetReuseAddr(err,s) == ANET_ERR){
+        close(s);
+        return ANET_ERR;
+    }
+    return s;
+}
+
+#define ANET_CONNECT_NONE 0
+#define ANET_CONNECT_NONBLOCK 1
+#define ANET_CONNECT_BE_BINDING 2
+static int anetTcpGenericConnect(char *err,char *addr,int port,char *source_addr,int flags){
+    
+}
 
