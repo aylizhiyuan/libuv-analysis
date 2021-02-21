@@ -39,7 +39,7 @@ static void anetSetError(char *err,const char *fmt,...){
     // 将ap指针关闭
     va_end(ap);
 }
-
+// 将一个文件的句柄设置为阻塞模式,默认就是阻塞模式
 int anetSetBlock(char *err,int fd,int non_block){
     int flags;
     // 获取文件状态标记
@@ -179,21 +179,26 @@ int anetSendTimeout(char *err,int fd,long long ms){
  * @param {char} *host
  * @param {char} *ipbuf
  * @param {size_t} ipbuf_len
- * @param {int} flags
+ * @param {int} flags 用来指定如何处理地址和名字
  * @return {*}
  */
 int anetGenericResolve(char *err,char *host,char *ipbuf,size_t ipbuf_len,int flags){
+    // 创建一个地址信息结构体
     struct addrinfo hints,*info;
     int rv;
+    // 开辟内存空间
     memset(&hints,0,sizeof(hints));
+    // 以端口号返回服务
     if(flags & ANET_IP_ONLY) hints.ai_flags = AI_NUMERICHOST;
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_family = AF_UNSPEC;// 未指定
+    hints.ai_socktype = SOCK_STREAM; // TCP
     if ((rv = getaddrinfo(host, NULL, &hints, &info)) != 0) {
         anetSetError(err, "%s", gai_strerror(rv));
         return ANET_ERR;
     }
+    // 对获取的IP地址做判断
     if (info->ai_family == AF_INET) {
+        // 获取 IP地址
         struct sockaddr_in *sa = (struct sockaddr_in *)info->ai_addr;
         inet_ntop(AF_INET, &(sa->sin_addr), ipbuf, ipbuf_len);
     } else {
