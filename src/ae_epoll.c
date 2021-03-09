@@ -9,13 +9,15 @@
 // 创建一个结构体
 typedef struct aeApiState {
     int epfd; // 由epoll_create生成的epoll专用的文件描述符
-    struct epoll_event *events; // 要监听的事件类型(EPOLLIN)和socket句柄信息(listenfd)
+    struct epoll_event *events; // 哪些发生了读、写事件
 } aeApiState
 
-// 应该是创建一个loop
+// add into EventLoop
 static int aeApiCreate(aeEventLoop *eventLoop){
+    // 创建一个结构体的指针,并分配内存
     aeApiState *state = zmalloc(sizeof(aeApiState));
     if(!state) return -1;
+    // 创建我们的事件列表
     state->events = zmalloc(sizeof(struct epoll_event)*eventLoop->setsize);
     if(!state->events){
         zfree(state);
@@ -35,16 +37,18 @@ static int aeApiCreate(aeEventLoop *eventLoop){
 
 static int aeAPiResize(aeEventLoop *eventLoop,int setsize){
     aeApiState *state = eventLoop->apidata;
-    // 重新调整malloc的内存分配
+    // 重新调整EventLoop的事件列表的长度
     state->events = zrealloc(state->events, sizeof(struct epoll_event)*setsize);
     return 0;   
 }
+// 删除我们的事件
 static void aeApiFree(aeEventLoop *eventLoop){
     aeApiState *state = eventLoop->apidata;
     close(state->epfd);
     zfree(state->events);
     zfree(state);
 }
+// 给evetLoop.apiData添加事件
 static int aeAPiAddEvent(aeEventLoop *eventLoop,int fd,int mask){
     aeApiState *state = eventLoop->apidata;
     struct epoll_event ee = {0};
