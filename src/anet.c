@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2021-02-21 13:46:25
- * @LastEditTime: 2021-03-16 11:39:48
+ * @LastEditTime: 2021-03-16 11:52:03
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: /libuv-analysis/src/anet.c
@@ -314,12 +314,14 @@ static int anetTcpGenericConnect(char *err,char *addr,int port,char *source_addr
     memset(&hints,0,sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
+    // 根据域名,拿到IP地址信息
     if((rv = getaddrinfo(addr,portstr,&hints,&servinfo)) != 0){
         anetSetError(err,"%s",gai_strerror(rv));
         return ANET_ERR;
     }
     // 拿到地址信息,可能一个域名有多个IP地址
     for(p = servinfo;p != NULL;p = p->ai_next){
+        // 创建socket对象
         if((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1){
             continue;
         }
@@ -345,6 +347,7 @@ static int anetTcpGenericConnect(char *err,char *addr,int port,char *source_addr
                 goto error;
             }
         }
+        // 建立连接
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
             /* If the socket is non-blocking, it is ok for connect() to
              * return an EINPROGRESS error here. */
@@ -441,8 +444,14 @@ int anetUnixNonBlockConnect(char *err, char *path)
     return anetUnixGenericConnect(err,path,ANET_CONNECT_NONBLOCK);
 }
 
-/* Like read(2) but make sure 'count' is read before to return
- * (unless error or EOF condition is encountered) */
+
+/**
+ * @description: 读操作
+ * @param {int} fd
+ * @param {char} *buf
+ * @param {int} count
+ * @return {*}
+ */
 int anetRead(int fd, char *buf, int count)
 {
     ssize_t nread, totlen = 0;
@@ -456,8 +465,14 @@ int anetRead(int fd, char *buf, int count)
     return totlen;
 }
 
-/* Like write(2) but make sure 'count' is written before to return
- * (unless error is encountered) */
+
+/**
+ * @description: 写操作
+ * @param {int} fd
+ * @param {char} *buf
+ * @param {int} count
+ * @return {*}
+ */
 int anetWrite(int fd, char *buf, int count)
 {
     ssize_t nwritten, totlen = 0;
@@ -471,6 +486,15 @@ int anetWrite(int fd, char *buf, int count)
     return totlen;
 }
 
+/**
+ * @description: 监听
+ * @param {char} *err
+ * @param {int} s
+ * @param {structsockaddr} *sa
+ * @param {socklen_t} len
+ * @param {int} backlog
+ * @return {*}
+ */
 static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int backlog) {
     if (bind(s,sa,len) == -1) {
         anetSetError(err, "bind: %s", strerror(errno));
@@ -644,15 +668,13 @@ error:
     return -1;
 }
 
-/* Format an IP,port pair into something easy to parse. If IP is IPv6
- * (matches for ":"), the ip is surrounded by []. IP and port are just
- * separated by colons. This the standard to display addresses within Redis. */
+
 int anetFormatAddr(char *buf, size_t buf_len, char *ip, int port) {
     return snprintf(buf,buf_len, strchr(ip,':') ?
            "[%s]:%d" : "%s:%d", ip, port);
 }
 
-/* Like anetFormatAddr() but extract ip and port from the socket's peer. */
+
 int anetFormatPeer(int fd, char *buf, size_t buf_len) {
     char ip[INET6_ADDRSTRLEN];
     int port;
