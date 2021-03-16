@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:10:58
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-16 13:46:25
+ * @LastEditTime: 2021-03-16 17:36:17
  */
 
 #include <stdio.h>
@@ -37,6 +37,7 @@ aeEventLoop *aeCreateEventLoop(int setsize){
     aeEventLoop *eventLoop;
     int i;
     if((eventLoop = zmalloc(sizeof(*eventLoop))) == NULL) goto err;
+    // 不清楚这个是干嘛的....
     eventLoop->events = zmalloc(sizeof(aeFileEvent)*setsize);
     
 }

@@ -1,8 +1,8 @@
 /*
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:11:04
- * @LastEditors: lizhiyuan
- * @LastEditTime: 2021-01-08 15:14:24
+ * @LastEditors: Please set LastEditors
+ * @LastEditTime: 2021-03-16 17:53:46
  */
 #ifndef __AE_H__
 #define __AE_H__
@@ -33,7 +33,7 @@ typedef void aeBeforeSleepProc(struct aeEventLoop *eventLoop);
 // 定义一种结构体
 typedef struct aeFileEvent {
     int mask;
-    aeFileProc *rfileProc;
+    aeFileProc *rfileProc; // 指向函数的指针？
     aeFileProc *wfileProc;
     void *clientData;
 } aeFileEvent;
