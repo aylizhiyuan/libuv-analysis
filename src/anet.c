@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2021-02-21 13:46:25
- * @LastEditTime: 2021-03-16 11:52:03
+ * @LastEditTime: 2021-03-17 10:53:48
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: /libuv-analysis/src/anet.c
@@ -329,6 +329,7 @@ static int anetTcpGenericConnect(char *err,char *addr,int port,char *source_addr
         if(flags & ANET_CONNECT_NONBLOCK && anetNonBlock(err,s) != ANET_OK){
             goto error;
         }
+        // 这里我不知道为什么还要去bind一下这个地址信息
         if(source_addr){
             int bound = 0;
             if((rv = getaddrinfo(source_addr,NULL,&hints,&bservinfo)) != 0){
@@ -487,7 +488,7 @@ int anetWrite(int fd, char *buf, int count)
 }
 
 /**
- * @description: 监听
+ * @description: 监听 bind & listen
  * @param {char} *err
  * @param {int} s
  * @param {structsockaddr} *sa
@@ -586,6 +587,14 @@ int anetUnixServer(char *err, char *path, mode_t perm, int backlog)
     return s;
 }
 
+/**
+ * @description: 三次握手后,如果有事件发生的时候accpet拿到发生事件的文件句柄
+ * @param {char} *err
+ * @param {int} s
+ * @param {structsockaddr} *sa
+ * @param {socklen_t} *len
+ * @return {*}
+ */
 static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *len) {
     int fd;
     while(1) {

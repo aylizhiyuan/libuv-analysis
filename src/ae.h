@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:11:04
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-16 17:53:46
+ * @LastEditTime: 2021-03-17 14:00:31
  */
 #ifndef __AE_H__
 #define __AE_H__
@@ -58,15 +58,15 @@ typedef struct aeFiredEvent {
 
 /* State of an event based program */
 typedef struct aeEventLoop {
-    int maxfd;   /* highest file descriptor currently registered */
-    int setsize; /* max number of file descriptors tracked */
+    int maxfd;   /* 能注册的最大的文件数量 */
+    int setsize; /* eventLoop的大小 */
     long long timeEventNextId;
     time_t lastTime;     /* Used to detect system clock skew */
-    aeFileEvent *events; /* Registered events */
-    aeFiredEvent *fired; /* Fired events */
+    aeFileEvent *events; /* 注册的事件 */
+    aeFiredEvent *fired; /* 发生读事件的文件 */
     aeTimeEvent *timeEventHead;
     int stop;
-    void *apidata; /* This is used for polling API specific data */
+    void *apidata; /* epoll的实例 */
     aeBeforeSleepProc *beforesleep;
     aeBeforeSleepProc *aftersleep;
 } aeEventLoop;
