@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:10:58
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-16 17:36:17
+ * @LastEditTime: 2021-03-17 14:21:08
  */
 
 #include <stdio.h>
@@ -36,10 +36,97 @@
 aeEventLoop *aeCreateEventLoop(int setsize){
     aeEventLoop *eventLoop;
     int i;
+    // 1. eventLoop开辟空间
     if((eventLoop = zmalloc(sizeof(*eventLoop))) == NULL) goto err;
-    // 不清楚这个是干嘛的....
+    // 2. eventLoop->events 注册的事件数组开辟空间
     eventLoop->events = zmalloc(sizeof(aeFileEvent)*setsize);
-    
+    // 3. eventLoop->fired 监听到的事件数组开辟空间
+    eventLoop->fired = zmalloc(sizeof(aeFiredEvent)*setsize);
+    if(eventLoop->events == NULL || eventLoop->fired == NULL) goto err;
+    eventLoop->setsize = setsize;
+    eventLoop->lastTime = time(NULL);
+    eventLoop->timeEventHead = NULL;
+    eventLoop->timeEventNextId = 0;
+    eventLoop->stop = 0;
+    eventLoop->maxfd = -1;
+    eventLoop->beforesleep = NULL;
+    eventLoop->aftersleep =  NULL;
+    // 创建epoll/kqueue的实例 = eventLoop->apidata =  实例
+    if(aeApiCreate(eventLoop) == -1) goto err;
+    for(i=0;i<setsize;i++){
+        eventLoop->events[i].mask = AE_NONE; // 设置默认值
+    }
+    return eventLoop;
+err:
+    if(eventLoop){
+        zfree(eventLoop->events);
+        zfree(eventLoop->fired);
+        zfree(eventLoop);
+    }    
+    return NULL;
+}
+
+int aeGetSetSize(aeEventLoop *eventLoop){
+    return eventLoop->setsize;
+}
+
+/**
+ * @description: 重新设置eventLoop的大小
+ * @param {aeEventLoop} *eventLoop
+ * @param {int} setsize
+ * @return {*}
+ */
+int aeResizeSetSize(aeEventLoop *eventLoop,int setsize){
+    int i;
+    if(setsize == eventLoop->setsize) return AE_OK;
+    if(eventLoop->maxfd >= setsize) return AE_ERR;
+    if(aeApiResize(eventLoop,setsize) == -1) return AE_ERR;
+    eventLoop->events = zrealloc(eventLoop->events,sizeof(aeFileEvent)*setsize);
+    eventLoop->fired = zrealloc(eventLoop->fired,sizeof(aeFiredEvent)*setsize);
+    eventLoop->setsize = setsize;
+    for (i = eventLoop->maxfd+1; i < setsize; i++)
+        eventLoop->events[i].mask = AE_NONE;
+    return AE_OK;
+}
+
+void aeDeleteEventLoop(aeEventLoop *eventLoop){
+    aeApiFree(eventLoop);
+    zfree(eventLoop->events);
+    zfree(eventLoop->fired);
+    zfree(eventLoop);
+}
+void aeStop(aeEventLoop *eventLoop){
+    eventLoop->stop = 1;
+}
+/**
+ * @description: 
+ * @param {aeEventLoop} *eventLoop
+ * @param {int} fd
+ * @param {int} mask
+ * @param {aeFileProc} *proc
+ * @param {void} *clientData
+ * @return {*}
+ */
+int aeCreateFileEvent(aeEventLoop *eventLoop,int fd,int mask,aeFileProc *proc,void *clientData){
+    // 如果超过了eventLoop的大小的话,直接报错...
+    if(fd >= eventLoop->setsize){
+        errno = ERANGE;
+        return AE_ERR;
+    }
+    // 
+    aeFileEvent *fe = &eventLoop->events[fd];
+    // 将当前的文件fd添加到epoll/kqueue的监听列表中去,使用epoll_ctl / kevent
+    if(aeApiAddEvent(eventLoop,fd,mask) == -1){
+        return AE_ERR;
+    }
+    fe->mask |= mask;
+    if(mask & AE_READABLE) fe->rfileProc = proc;
+    if(mask & AE_WRITABLE) fe->wfileProc = proc;
+    fe->clientData = clientData;
+    if(fd > eventLoop->maxfd){
+        eventLoop->maxfd = fd;
+    }
+    return AE_OK;
 }
 
 
