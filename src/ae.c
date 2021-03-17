@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:10:58
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-17 16:17:24
+ * @LastEditTime: 2021-03-17 16:44:53
  */
 
 #include <stdio.h>
@@ -209,7 +209,7 @@ static void aeAddMillisecondsToNow(long long milliseconds,long *sec,long *ms){
  * @return {*}
  */
 long long aeCreateTimeEvent(aeEventLoop *eventLoop,long long milliseconds,aeTimeProc *proc,void *clientData,aeEventFinalizerProc *finalizerProc){
-
+    
 }
 
 /**
@@ -248,14 +248,30 @@ int aeProcessEvents(aeEventLoop *eventLoop,int flags){
 }
 
 /**
- * @description: 
+ * @description: 利用poll来完成阻塞等待....
  * @param {int} fd
  * @param {int} mask
  * @param {longlong} milliseconds
  * @return {*}
  */
-int aeWait(int fd,int mask,long long milliseconds){
-    
+int aeWait(int fd, int mask, long long milliseconds) {
+    struct pollfd pfd;
+    int retmask = 0, retval;
+
+    memset(&pfd, 0, sizeof(pfd));
+    pfd.fd = fd;
+    if (mask & AE_READABLE) pfd.events |= POLLIN;
+    if (mask & AE_WRITABLE) pfd.events |= POLLOUT;
+
+    if ((retval = poll(&pfd, 1, milliseconds))== 1) {
+        if (pfd.revents & POLLIN) retmask |= AE_READABLE;
+        if (pfd.revents & POLLOUT) retmask |= AE_WRITABLE;
+        if (pfd.revents & POLLERR) retmask |= AE_WRITABLE;
+        if (pfd.revents & POLLHUP) retmask |= AE_WRITABLE;
+        return retmask;
+    } else {
+        return retval;
+    }
 }
 
 // 所有的异步一定是用一个特别的线程实现的,该线程专门用来处理
