@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2019-10-06 15:06:49
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-18 15:29:40
+ * @LastEditTime: 2021-03-18 17:28:36
 -->
 # libuv源码分析
 
@@ -168,6 +168,14 @@ NodeJS中为了不积压,pipe当可写流返回false的时候,可读流停止..�
 
 
 
+
+### redis异步库
+
+所有的IO操作都会大大降低程序的运行速度,所以,可以将所有的IO操作放入EventLoop中，当条件达到的时候触发回调函数执行.
+
+正常的程序的临时变量、函数的参数都会入栈,函数调用的地址也会入栈,对于异步任务的回调函数,它是暂时不入栈执行的,当eventLoop中触发后,再放入栈中。
+
+所以,总的来看,实现一个eventLoop的
 
 
 

@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:10:58
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-18 15:05:57
+ * @LastEditTime: 2021-03-18 16:49:46
  */
 
 #include <stdio.h>
@@ -318,8 +318,21 @@ static int processTimeEvents(aeEventLoop *eventLoop){
             continue;
         }
         aeGetTime(&now_sec,&now_ms); // 获取当前时间的秒数和毫秒数
-        
-
+        // 当前的定时任务 == 当前时间或者超过当前时间的时候,可以考虑将当前的任务执行
+        if(now_sec > te->when_sec || (now_sec == te->when_sec && now_ms >= te->when_ms)){
+            int retval;
+            id = te->id;
+            // 什么时候这个timeProc会调用呢...
+            // 我感觉这个就是所谓的回调函数吧...啊哈哈哈哈
+            retval = te->timeProc(eventLoop,id,te->clientData);
+            processed++;
+            if(retval != AE_NOMORE){
+                // 这个地方存疑.....感觉应该是这个回调执行完毕后没有正常返回-1的时候
+                aeAddMillisecondsToNow(retval,&te->when_sec,&te->when_ms);
+            }else{
+                te->id = AE_DELETED_EVENT_ID; // 执行完毕后直接失效掉这个定时任务
+            }
+        }
         te = te->next;
     }
     return processed;
@@ -338,7 +351,13 @@ static int processTimeEvents(aeEventLoop *eventLoop){
 // 如果标志设置了AE_CALL_AFTER_SLEEP 则调用后睡眠回调
 int aeProcessEvents(aeEventLoop *eventLoop,int flags){
     int processed = 0,numevents;
+    if(!(flags & AE_TIME_EVENTS) && !(flags & AE_FILE_EVENTS)) return 0;
+    if(eventLoop->maxfd != 1 || ((flags & AE_TIME_EVENTS) && (flags & AE_DONT_WAIT))){
+        
+    }
+    
     if(flags & AE_TIME_EVENTS){
+        // 执行所有的定时任务回调函数....
         processed += processTimeEvents(eventLoop);
     }
     return processed;

@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:11:04
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-17 14:00:31
+ * @LastEditTime: 2021-03-18 16:25:10
  */
 #ifndef __AE_H__
 #define __AE_H__
@@ -19,6 +19,7 @@
 #define AE_ALL_EVENTS (AE_FILE_EVENTS|AE_TIME_EVENTS)
 #define AE_DONT_WAIT 4
 #define AE_CALL_AFTER_SLEEP 8
+#define AE_NOMORE -1
 #define AE_DELETED_EVENT_ID -1
 
 #define AE_NOTUSED(v)((void) V)
@@ -43,7 +44,7 @@ typedef struct aeTimeEvent {
     long long id; /* time event identifier. */
     long when_sec; /* seconds */
     long when_ms; /* milliseconds */
-    aeTimeProc *timeProc;
+    aeTimeProc *timeProc;      
     aeEventFinalizerProc *finalizerProc;
     void *clientData;
     struct aeTimeEvent *prev;
