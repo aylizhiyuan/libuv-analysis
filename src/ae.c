@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:10:58
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-17 16:44:53
+ * @LastEditTime: 2021-03-18 13:45:51
  */
 
 #include <stdio.h>
@@ -200,7 +200,7 @@ static void aeAddMillisecondsToNow(long long milliseconds,long *sec,long *ms){
 }
 
 /**
- * @description: 
+ * @description: 添加事件队列到链表中
  * @param {aeEventLoop} *eventLoop
  * @param {longlong} milliseconds
  * @param {aeTimeProc} *proc
@@ -209,28 +209,64 @@ static void aeAddMillisecondsToNow(long long milliseconds,long *sec,long *ms){
  * @return {*}
  */
 long long aeCreateTimeEvent(aeEventLoop *eventLoop,long long milliseconds,aeTimeProc *proc,void *clientData,aeEventFinalizerProc *finalizerProc){
-    
+    long long id = eventLoop->timeEventNextId ++;
+    aeTimeEvent *te;
+    te = zmalloc(sizeof(*te));
+    if(te == NULL) return AE_ERR;
+    te->id = id;
+    // 拿到定时时间的秒数te->when_sec,以及定时时间的毫秒数te->when_ms
+    aeAddMillisecondsToNow(milliseconds,&te->when_sec,&te->when_ms);
+    te->timeProc = proc;
+    te->finalizerProc = finalizerProc;
+    te->clientData = clientData;
+    te->prev = NULL;
+    // 将所有的加入的定时任务组成一个双向的链表...
+    te->next = eventLoop->timeEventHead;
+    if(te->next){
+        te->next->prev = te;
+    }
+    // 把当前定时任务的结构体放到timeEventhead上..
+    // 任务1(Eventhead) ---> 任务2 ----> 任务3
+    eventLoop->timeEventHead = te;
+    return id;  
 }
-
 /**
- * @description: 
+ * @description: 将当前的id从事件链表中删除...
  * @param {aeEventLoop} *eventLoop
  * @param {longlong} id
  * @return {*}
  */
 int adDeleteTimeEvent(aeEventLoop *eventLoop,long long id){
-    
+    aeTimeEvent *te = eventLoop->timeEventHead;
+    while(te){
+        if(te->id == id){
+            // 如果发现了这个,将他的id赋值为-1
+            te->id = AE_DELETED_EVENT_ID;
+            return AE_OK;
+        }
+        te = te->next;
+    }
+    return AE_ERR;
 }
 /**
- * @description: 
+ * @description: 感觉这个应该是返回离得最近的定时任务
  * @param {aeEventLoop} *eventLoop
  * @return {*}
  */
 static aeTimeEvent *aeSearchNearestTimer(aeEventLoop *eventLoop){
-    
+    aeTimeEvent *te = eventLoop->timeEventHead;
+    aeTimeEvent *nearest = NULL;
+    while(te){
+        if (!nearest || te->when_sec < nearest->when_sec ||
+                (te->when_sec == nearest->when_sec &&
+                 te->when_ms < nearest->when_ms))
+            nearest = te;
+        te = te->next;
+    }
+    return nearest;
 }
 /**
- * @description: 
+ * @description: 核心
  * @param {aeEventLoop} *eventLoop
  * @return {*}
  */
@@ -238,7 +274,7 @@ static int processTimeEvents(aeEventLoop *eventLoop){
     
 }
 /**
- * @description: 
+ * @description: 核心
  * @param {aeEventLoop} *eventLoop
  * @param {int} flags
  * @return {*}
