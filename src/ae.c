@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2021-01-07 15:10:58
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-18 13:45:51
+ * @LastEditTime: 2021-03-18 15:05:57
  */
 
 #include <stdio.h>
@@ -179,7 +179,7 @@ static void aeGetTime(long *seconds,long *milliseconds){
     *milliseconds = tv.tv_usec/1000; // 毫秒
 }
 /**
- * @description: 
+ * @description: 在当前时间的基础上增加秒数或者是毫秒数
  * @param {longlong} milliseconds
  * @param {long} *sec
  * @param {long} *ms
@@ -188,14 +188,17 @@ static void aeGetTime(long *seconds,long *milliseconds){
 static void aeAddMillisecondsToNow(long long milliseconds,long *sec,long *ms){
    long cur_sec,cur_ms,when_sec,when_ms;
    aeGetTime(&cur_sec,&cur_ms); // 当前的时间
-   // 这个应该是结束的时间吧....
+   // 这个应该是定时的时间吧....
    when_sec = cur_sec + milliseconds/1000; // 秒
    when_ms = cur_ms + milliseconds%1000; // 毫秒
    if(when_ms >= 1000){
        when_sec ++ ;
        when_ms -= 1000;
    }
+   // 拿到的是当前时间的秒数
    *sec = when_sec;
+   // 拿到的是当前时间的毫秒数
+   // 当前时间 = when_sec + when_ms;
    *ms = when_ms;
 }
 
@@ -266,21 +269,79 @@ static aeTimeEvent *aeSearchNearestTimer(aeEventLoop *eventLoop){
     return nearest;
 }
 /**
- * @description: 核心
+ * @description: 核心---处理时间的事件
  * @param {aeEventLoop} *eventLoop
  * @return {*}
  */
 static int processTimeEvents(aeEventLoop *eventLoop){
-    
+    int processed = 0;
+    aeTimeEvent *te;
+    long long maxId;
+    time_t now = time(NULL); // 获取当前的时间的秒数
+    if(now < eventLoop->lastTime){
+        // 拿到第一个定时任务
+        te = eventLoop->timeEventHead;
+        // 循环所有的定时任务
+        while(te){
+            te->when_sec = 0;
+            te = te->next;
+        }
+    }
+    eventLoop->lastTime = now; // 将启动定时任务的当前时间设置为loop的lastTime
+    te = eventLoop->timeEventHead;
+    maxId = eventLoop->timeEventNextId - 1;
+    // 循环所有的定时任务
+    while(te){
+        long now_sec,now_ms;
+        long long id;
+        // 1. 将移除的定时任务从链表中删除
+        if(te->id == AE_DELETED_EVENT_ID){
+            aeTimeEvent *next = te->next;
+            if(te->prev){
+                te->prev->next = te->next;
+            }else{
+                eventLoop->timeEventHead = te->next;
+            }
+            if(te->next){
+                te->next->prev = te->prev;
+            }
+            if(te->finalizerProc){
+                te->finalizerProc(eventLoop, te->clientData);
+            }
+            zfree(te);
+            te = next;
+            continue;
+        }
+        // 此处可以暂时忽略掉....
+        if(te->id > maxId){
+            te = te->next;
+            continue;
+        }
+        aeGetTime(&now_sec,&now_ms); // 获取当前时间的秒数和毫秒数
+        
+
+        te = te->next;
+    }
+    return processed;
 }
 /**
- * @description: 核心
+ * @description: 
  * @param {aeEventLoop} *eventLoop
  * @param {int} flags
- * @return {*}
+ * @return {*} 返回无需等待即可处理的事件
  */
+// 处理每个挂起的时间事件,处理每个挂起的文件事件
+// 标志设置了AE_ALL_EVENTS,则处理所有类型的事件
+// 标志设置了AE_FILE_EVENTS,则处理文件事件
+// 标志设置了AE_TIME_EVENtS,则处理时间事件
+// 如果标志设置了AE_DONT_WAIT,则该函数将尽快返回
+// 如果标志设置了AE_CALL_AFTER_SLEEP 则调用后睡眠回调
 int aeProcessEvents(aeEventLoop *eventLoop,int flags){
-    
+    int processed = 0,numevents;
+    if(flags & AE_TIME_EVENTS){
+        processed += processTimeEvents(eventLoop);
+    }
+    return processed;
 }
 
 /**
