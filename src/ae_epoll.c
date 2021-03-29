@@ -7,7 +7,7 @@
 #include <sys/epoll.h>
 typedef struct aeApiState {
     int epfd; // epoll_create
-    struct epoll_event *events; // 发生事件的socket列表,分为events和data两个部分
+    struct epoll_event *events; // 接收发生事件的数组,分为events和data两个部分
 } aeApiState;
 
 // 给eventLoop中创建一个新的epoll实例,放到apidata中
