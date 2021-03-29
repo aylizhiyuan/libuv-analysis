@@ -351,9 +351,90 @@ static int processTimeEvents(aeEventLoop *eventLoop){
 // 如果标志设置了AE_CALL_AFTER_SLEEP 则调用后睡眠回调
 int aeProcessEvents(aeEventLoop *eventLoop,int flags){
     int processed = 0,numevents;
+    // 如果没有任务做的话,直接返回
     if(!(flags & AE_TIME_EVENTS) && !(flags & AE_FILE_EVENTS)) return 0;
     if(eventLoop->maxfd != 1 || ((flags & AE_TIME_EVENTS) && (flags & AE_DONT_WAIT))){
-        
+        int j;
+        aeTimeEvent *shortest = NULL;
+        struct timeval tv,*tvp;
+        if(flags & AE_TIME_EVENTS && !(flags & AE_DONT_WAIT)){
+            shortest = aeSearchNearestTimer(eventLoop);
+        }
+        if(shortest){
+            long now_sec,now_ms;
+            // 获取当前的时间
+            aeGetTime(&now_sec,&now_ms);
+            tvp = &tv;
+            long long ms = (shortest->when_sec - now_sec)*1000 + shortest->when_ms - now_ms;
+            // 如果定时的时间还未到
+            if(ms > 0){
+                tvp->tv_sec = ms/1000;
+                tvp->tv_usec = (ms%1000)*1000;
+            }else{
+                tvp->tv_sec = 0;
+                tvp->tv_usec = 0;
+            }
+        }else{
+            if(flags & AE_DONT_WAIT){
+                tv.tv_sec = tv.tv_usec = 0;
+                tvp = &tv;
+            }else{
+                tvp = NULL;
+            }
+        }
+        // 在这里进行阻塞....
+        numevents = aeApiPoll(eventLoop,tvp);
+        if(eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP){
+            eventLoop->aftersleep(eventLoop);
+        }
+        for(j = 0;j < numevents;j++){
+             aeFileEvent *fe = &eventLoop->events[eventLoop->fired[j].fd];
+            int mask = eventLoop->fired[j].mask;
+            int fd = eventLoop->fired[j].fd;
+            int fired = 0; /* Number of events fired for current fd. */
+
+            /* Normally we execute the readable event first, and the writable
+             * event laster. This is useful as sometimes we may be able
+             * to serve the reply of a query immediately after processing the
+             * query.
+             *
+             * However if AE_BARRIER is set in the mask, our application is
+             * asking us to do the reverse: never fire the writable event
+             * after the readable. In such a case, we invert the calls.
+             * This is useful when, for instance, we want to do things
+             * in the beforeSleep() hook, like fsynching a file to disk,
+             * before replying to a client. */
+            int invert = fe->mask & AE_BARRIER;
+
+            /* Note the "fe->mask & mask & ..." code: maybe an already
+             * processed event removed an element that fired and we still
+             * didn't processed, so we check if the event is still valid.
+             *
+             * Fire the readable event if the call sequence is not
+             * inverted. */
+            if (!invert && fe->mask & mask & AE_READABLE) {
+                fe->rfileProc(eventLoop,fd,fe->clientData,mask);
+                fired++;
+            }
+
+            /* Fire the writable event. */
+            if (fe->mask & mask & AE_WRITABLE) {
+                if (!fired || fe->wfileProc != fe->rfileProc) {
+                    fe->wfileProc(eventLoop,fd,fe->clientData,mask);
+                    fired++;
+                }
+            }
+
+            /* If we have to invert the call, fire the readable event now
+             * after the writable one. */
+            if (invert && fe->mask & mask & AE_READABLE) {
+                if (!fired || fe->wfileProc != fe->rfileProc) {
+                    fe->rfileProc(eventLoop,fd,fe->clientData,mask);
+                    fired++;
+                }
+            }
+            processed++; 
+        }
     }
     
     if(flags & AE_TIME_EVENTS){
